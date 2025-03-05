@@ -1,15 +1,15 @@
 <html>
     <body>
-        <h2>{{path}}</h2>
+        <h2>{{path|escape}}</h2>
         <ul>
             {%if root != path%}
                 <li>
-                    <a href="/{{parent}}">..</a>
+                    <a href="/{{parent|urlencode}}">..</a>
                 </li>
             {%endif%}
             {%for item in listdir%}
                 <li>
-                    <a href="/{{item.path}}" {%if not item.is_dir%}target="_blank"{%endif%} data-mime="{{item.mime}}">{{item.name}}</a>
+                    <a href="/{{item.path|urlencode}}" {%if not item.is_dir%}target="_blank"{%endif%} data-mime="{{item.mime}}">{{item.name|escape}}</a>
                 </li>
             {%endfor%}
         </ul>
