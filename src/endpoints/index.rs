@@ -35,7 +35,10 @@ pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexRe
 
     let path = joined_path.as_path();
     let parent = diff_paths(path.parent().unwrap_or(path), root).unwrap();
-    let files = std::fs::read_dir(&joined_path).unwrap();
+    let mut files: Vec<_> = std::fs::read_dir(&joined_path).unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    files.sort_by_key(|dir| dir.path());
 
     println!("{}", joined_path.to_str().unwrap());
 
@@ -43,8 +46,7 @@ pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexRe
         path: path.to_str().unwrap(),
         root: root.to_str().unwrap(),
         parent: parent.to_str().unwrap(),
-        listdir: files.map(|entry| {
-            let entry = entry.unwrap();
+        listdir: files.iter().map(|entry| {
             let path = String::from(diff_paths(entry.path(), root).unwrap().to_str().unwrap());
             let name = String::from(entry.file_name().to_str().unwrap());
             let mime = mime_guess::from_path(entry.path()).first_or_octet_stream().to_string();
