@@ -2,7 +2,7 @@ use std::path::Path;
 use rocket::serde::Deserialize;
 use rocket::serde::json::Json;
 use rocket::State;
-use crate::Config;
+use crate::server_config::ServerConfig;
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -19,7 +19,7 @@ pub enum ChangePathResponse {
 }
 
 #[post("/change_path", format = "json", data = "<data>")]
-pub fn change_path(data: Json<ChangePath>, config: &State<Config>) -> ChangePathResponse {
+pub fn change_path(data: Json<ChangePath>, config: &State<ServerConfig>) -> ChangePathResponse {
     let new_path = data.path.clone();
     if !Path::new(new_path.as_str()).is_dir() {
         return ChangePathResponse::Err("Invalid path".to_string());

@@ -4,7 +4,7 @@ use rocket::fs::NamedFile;
 use rocket::serde::{Deserialize, Serialize};
 use rocket::State;
 use rocket_dyn_templates::{context, Template};
-use crate::Config;
+use crate::server_config::ServerConfig;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -24,7 +24,7 @@ pub enum IndexResponse {
 }
 
 #[get("/<query_path..>")]
-pub async fn index(query_path: PathBuf, config: &State<Config>) -> IndexResponse {
+pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexResponse {
     let current_path = config.current_path();
     let root = Path::new(&current_path);
     let joined_path = root.join(query_path);
