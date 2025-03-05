@@ -1,0 +1,17 @@
+<html>
+    <body>
+        <h2>{{path}}</h2>
+        <ul>
+            {%if root != path%}
+                <li>
+                    <a href="/{{parent}}">..</a>
+                </li>
+            {%endif%}
+            {%for item in listdir%}
+                <li>
+                    <a href="/{{item.path}}" {%if not item.is_dir%}target="_blank"{%endif%} data-mime="{{item.mime}}">{{item.name}}</a>
+                </li>
+            {%endfor%}
+        </ul>
+    </body>
+</html>
