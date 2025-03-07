@@ -5,6 +5,7 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket::State;
 use rocket_dyn_templates::{context, Template};
 use crate::server_config::ServerConfig;
+use human_sort;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -21,6 +22,8 @@ pub enum IndexResponse {
     Html(Template),
     #[response(status = 200)]
     File(NamedFile),
+    #[response(status = 404)]
+    NotFound(String),
 }
 
 #[get("/<query_path..>")]
@@ -34,11 +37,22 @@ pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexRe
     }
 
     let path = joined_path.as_path();
+
+    if !path.is_dir() {
+        return IndexResponse::NotFound("404 Not Found".to_string());
+    }
+
     let parent = diff_paths(path.parent().unwrap_or(path), root).unwrap();
     let mut files: Vec<_> = std::fs::read_dir(&joined_path).unwrap()
         .map(|r| r.unwrap())
         .collect();
-    files.sort_by_key(|dir| dir.path());
+    files.sort_by(|this, other| {
+        println!("{} : {}", this.file_name().to_str().unwrap(), other.file_name().to_str().unwrap());
+        human_sort::compare(
+            this.file_name().to_str().unwrap(),
+            other.file_name().to_str().unwrap(),
+        )
+    });
 
     println!("{}", joined_path.to_str().unwrap());
 
