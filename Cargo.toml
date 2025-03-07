@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-human-sort = "0.2.2"
+alphanumeric-sort = "1.5.3"
 mime_guess = "2.0.5"
 pathdiff = "0.2.3"
 rocket = { version = "0.5.1", features = ["json"] }

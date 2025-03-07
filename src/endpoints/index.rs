@@ -5,7 +5,6 @@ use rocket::serde::{Deserialize, Serialize};
 use rocket::State;
 use rocket_dyn_templates::{context, Template};
 use crate::server_config::ServerConfig;
-use human_sort;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -44,15 +43,16 @@ pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexRe
 
     let parent = diff_paths(path.parent().unwrap_or(path), root).unwrap();
     let mut files: Vec<_> = std::fs::read_dir(&joined_path).unwrap()
-        .map(|r| r.unwrap())
+        .map(|r| r.unwrap().path())
         .collect();
-    files.sort_by(|this, other| {
-        println!("{} : {}", this.file_name().to_str().unwrap(), other.file_name().to_str().unwrap());
-        human_sort::compare(
-            this.file_name().to_str().unwrap(),
-            other.file_name().to_str().unwrap(),
-        )
-    });
+    alphanumeric_sort::sort_path_slice(&mut files);
+    // files.sort_by(|this, other| {
+    //     println!("{} : {}", this.file_name().to_str().unwrap(), other.file_name().to_str().unwrap());
+    //     human_sort::compare(
+    //         this.file_name().to_str().unwrap(),
+    //         other.file_name().to_str().unwrap(),
+    //     )
+    // });
 
     println!("{}", joined_path.to_str().unwrap());
 
@@ -61,10 +61,10 @@ pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexRe
         root: root.to_str().unwrap(),
         parent: parent.to_str().unwrap(),
         listdir: files.iter().map(|entry| {
-            let path = String::from(diff_paths(entry.path(), root).unwrap().to_str().unwrap());
-            let name = String::from(entry.file_name().to_str().unwrap());
-            let mime = mime_guess::from_path(entry.path()).first_or_octet_stream().to_string();
-            let is_dir = entry.path().is_dir();
+            let path = String::from(diff_paths(entry, root).unwrap().to_str().unwrap());
+            let name = String::from(entry.file_name().unwrap().to_str().unwrap());
+            let mime = mime_guess::from_path(entry).first_or_octet_stream().to_string();
+            let is_dir = entry.is_dir();
             Item {
                 path,
                 mime,
