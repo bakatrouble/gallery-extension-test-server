@@ -1,9 +1,8 @@
-use std::path::{Path, PathBuf};
-use rocket::figment::util::diff_paths;
-use rocket::fs::NamedFile;
+use std::path::Path;
+use pathdiff::diff_paths;
 use rocket::serde::{Deserialize, Serialize};
+use rocket::serde::json::Json;
 use rocket::State;
-use rocket_dyn_templates::{context, Template};
 use crate::server_config::ServerConfig;
 
 #[derive(Serialize, Deserialize)]
@@ -15,66 +14,68 @@ struct Item {
     is_dir: bool,
 }
 
-#[derive(Responder)]
-pub enum IndexResponse {
-    #[response(status = 200)]
-    Html(Template),
-    #[response(status = 200)]
-    File(NamedFile),
-    #[response(status = 404)]
-    NotFound(String),
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct IndexJsonSuccess {
+    items: Vec<Item>,
+    current_path: String,
+    parent_path: String,
+    root_path: String,
 }
 
-#[get("/<query_path..>")]
-pub async fn index(query_path: PathBuf, config: &State<ServerConfig>) -> IndexResponse {
+#[derive(Responder)]
+pub enum IndexJsonResponse {
+    #[response(status = 200)]
+    Html(Json<IndexJsonSuccess>),
+    #[response(status = 404)]
+    NotFound(&'static str),
+}
+
+#[get("/index?<path>")]
+pub async fn index(path: Option<String>, config: &State<ServerConfig>) -> IndexJsonResponse {
     let current_path = config.current_path();
     let root = Path::new(&current_path);
-    let joined_path = root.join(query_path);
-
-    if joined_path.is_file() {
-        return IndexResponse::File(NamedFile::open(joined_path).await.unwrap());
+    let mut path = path.unwrap_or("/".into());
+    while path.starts_with('/') {
+        path = path[1..].to_string()
     }
+    let joined_path = root.join(&path);
+    println!("{} + {} = {}", (&root).to_str().unwrap(), &path, (&joined_path).to_str().unwrap());
 
     let path = joined_path.as_path();
 
     if !path.is_dir() {
-        return IndexResponse::NotFound("404 Not Found".to_string());
+        return IndexJsonResponse::NotFound("404 Not Found");
     }
 
     let parent = diff_paths(path.parent().unwrap_or(path), root).unwrap();
-    let mut files: Vec<_> = std::fs::read_dir(&joined_path).unwrap()
+    let files: Vec<_> = std::fs::read_dir(&joined_path).unwrap()
         .map(|r| r.unwrap().path())
         .collect();
-    alphanumeric_sort::sort_path_slice(&mut files);
-    // files.sort_by(|this, other| {
-    //     println!("{} : {}", this.file_name().to_str().unwrap(), other.file_name().to_str().unwrap());
-    //     human_sort::compare(
-    //         this.file_name().to_str().unwrap(),
-    //         other.file_name().to_str().unwrap(),
-    //     )
-    // });
 
-    println!("{}", joined_path.to_str().unwrap());
+    let items = files.iter().map(|entry| {
+        let path = String::from(diff_paths(entry, root).unwrap().to_str().unwrap());
+        let name = String::from(entry.file_name().unwrap().to_str().unwrap());
+        let mime = mime_guess::from_path(entry).first_or_octet_stream().to_string();
+        let is_dir = entry.is_dir();
+        Item {
+            path,
+            name,
+            mime,
+            is_dir,
+        }
+    }).collect();
 
-    let ctx = context! {
-        path: path.to_str().unwrap(),
-        root: root.to_str().unwrap(),
-        parent: parent.to_str().unwrap(),
-        listdir: files.iter().map(|entry| {
-            let path = String::from(diff_paths(entry, root).unwrap().to_str().unwrap());
-            let name = String::from(entry.file_name().unwrap().to_str().unwrap());
-            let mime = mime_guess::from_path(entry).first_or_octet_stream().to_string();
-            let is_dir = entry.is_dir();
-            Item {
-                path,
-                mime,
-                name,
-                is_dir,
-            }
-        }).collect::<Vec<_>>()
+    let current_path = String::from(joined_path.to_str().unwrap());
+    let parent_path = String::from(parent.to_str().unwrap());
+    let root_path = String::from(root.to_str().unwrap());
+
+    let success = IndexJsonSuccess {
+        items,
+        current_path,
+        parent_path,
+        root_path,
     };
 
-    IndexResponse::Html(
-        Template::render("list", ctx)
-    )
+    IndexJsonResponse::Html(Json(success))
 }
