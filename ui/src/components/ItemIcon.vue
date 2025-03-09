@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { getThumbnailUrl, IndexItem } from "../api.js";
+import { getThumbnailUrl, type IndexItem } from "../api.js";
 import { getIcon } from "material-file-icons";
 import { computed, ref, useTemplateRef } from "vue";
-import Spinner from "./Spinner.vue";
 import { useElementVisibility } from "@vueuse/core";
+import Spinner from "./Spinner.vue";
 
 const { item } = defineProps<{
   item: IndexItem,

@@ -1,8 +1,10 @@
 pub mod endpoints;
 mod server_config;
 
+use std::sync::Mutex;
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::web::Data;
 use server_config::ServerConfig;
 use rust_embed::Embed;
 use env_logger::Env;
@@ -11,6 +13,7 @@ use endpoints::{
     thumbnail::thumbnail,
     index::index,
     download::download,
+    get_server_config::get_server_config,
 };
 
 #[derive(Embed)]
@@ -38,6 +41,8 @@ async fn main() -> std::io::Result<()> {
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
+    let server_config = Data::new(ServerConfig::new());
+
     let app = HttpServer::new(move || {
         let cors = if is_debug {
             Cors::default()
@@ -52,13 +57,14 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default())
             .wrap(cors)
-            .app_data(web::Data::new(ServerConfig::new()))
+            .app_data(server_config.clone())
             .service(
                 web::scope("/api")
                     .service(download)
                     .service(thumbnail)
                     .service(index)
                     .service(change_path)
+                    .service(get_server_config)
             )
             .service(
                 web::resource("/__assets/{path:.*}")

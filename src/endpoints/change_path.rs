@@ -26,7 +26,7 @@ pub async fn change_path(body: web::Json<ChangePath>, config: web::Data<ServerCo
                 message: Some("Not a directory"),
             })
     } else {
-        config.set_current_path(&new_path);
+        *config.current_path.lock().unwrap() = new_path.clone();
         HttpResponse::Ok()
             .json(Response {
                 success: true,

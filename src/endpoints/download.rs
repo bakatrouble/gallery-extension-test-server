@@ -11,7 +11,7 @@ struct DownloadQuery {
 
 #[get("/download")]
 pub async fn download(query: web::Query<DownloadQuery>, config: web::Data<ServerConfig>) -> Either<NamedFile, HttpResponse> {
-    let current_path = config.current_path();
+    let current_path = config.get_current_path();
     let root = Path::new(&current_path);
     let mut path = query.path.clone();
     while path.starts_with('/') {

@@ -1,30 +1,35 @@
 <script setup lang="ts">
 
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { fetchIndex, getDownloadUrl, getThumbnailUrl, IndexItem, IndexResponse } from "./api";
-import { getIcon } from "material-file-icons";
-import Spinner from "./components/Spinner.vue";
+import { fetchIndex, fetchServerConfig, getDownloadUrl, type IndexResponse, type ServerConfigResponse } from "./api";
 import ItemIcon from "./components/ItemIcon.vue";
 import ItemTitle from "./components/ItemTitle.vue";
 import Breadcrumbs from "./components/Breadcrumbs.vue";
+import alphaSort from "alpha-sort";
+import Spinner from "./components/Spinner.vue";
 
-let currentQueryPath = ref("/");
+const currentQueryPath = ref("/");
+const initialized = ref(false);
 
 onMounted(() => {
   currentQueryPath.value = window.location.pathname;
-})
+  window.addEventListener('popstate', () => {
+    currentQueryPath.value = window.location.pathname;
+  });
+  updateTitle();
+});
 
-const { data, isLoading, isError } = useQuery<IndexResponse>({
+const { data, isLoading, isError, refetch } = useQuery<IndexResponse>({
   queryKey: ['index', currentQueryPath],
   queryFn: async () => {
     const response = await fetchIndex(currentQueryPath.value);
     const dirs = response.items
       .filter((item) => item.is_dir)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => [a.name, b.name].sort(alphaSort({ caseInsensitive: true })).indexOf(a.name) === 0 ? -1 : 1)
     const files = response.items
       .filter((item) => !item.is_dir)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => [a.name, b.name].sort(alphaSort({ caseInsensitive: true })).indexOf(a.name) === 0 ? -1 : 1)
     return {
       ...response,
       items: dirs.concat(files),
@@ -32,7 +37,26 @@ const { data, isLoading, isError } = useQuery<IndexResponse>({
   }
 });
 
-const navigate = async (path: string) => {
+const { data: serverConfig } = useQuery<ServerConfigResponse>({
+  queryKey: ['serverConfig'],
+  queryFn: fetchServerConfig,
+  refetchInterval: 500,
+});
+
+watch(serverConfig, (newConfig, oldConfig) => {
+  if (newConfig?.current_path != oldConfig?.current_path && initialized.value) {
+    navigate('/');
+    refetch();
+  }
+  initialized.value = true;
+});
+
+let updateTitle = () => {
+  document.title = `Files - ${currentQueryPath.value}`;
+};
+watch(currentQueryPath, updateTitle);
+
+const navigate = (path: string) => {
   currentQueryPath.value = path;
   window.history.pushState({}, '', path);
 }
@@ -42,7 +66,7 @@ const navigate = async (path: string) => {
 <template>
   <div class="@container flex flex-col w-3/4 pt-4 min-h-svh">
     <breadcrumbs
-      :root="data?.root_path"
+      :root="serverConfig?.current_path"
       :path="currentQueryPath"
       @navigate="(path: string) => navigate(path)"
     />

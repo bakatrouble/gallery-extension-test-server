@@ -35,7 +35,7 @@ struct IndexQuery {
 
 #[get("/index")]
 pub async fn index(query: web::Query<IndexQuery>, config: web::Data<ServerConfig>) -> impl Responder {
-    let current_path = config.current_path().replace("\\", "/");
+    let current_path = config.get_current_path().replace("\\", "/");
     let root = Path::new(&current_path);
     let mut path = query.path.clone().unwrap_or("/".into()).replace("\\", "/");
     while path.starts_with('/') {

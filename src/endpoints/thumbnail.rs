@@ -34,7 +34,7 @@ struct ThumbnailQuery {
 
 #[get("/thumbnail")]
 pub async fn thumbnail(query: web::Query<ThumbnailQuery>, config: web::Data<ServerConfig>) -> impl Responder {
-    let current_path = config.current_path();
+    let current_path = config.get_current_path();
     let root = Path::new(&current_path);
     let mut path = query.path.clone();
     while path.starts_with('/') {
