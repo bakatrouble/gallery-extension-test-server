@@ -1,12 +1,10 @@
 use std::path::Path;
+use actix_web::{get, web, HttpResponse, Responder};
 use pathdiff::diff_paths;
-use rocket::serde::{Deserialize, Serialize};
-use rocket::serde::json::Json;
-use rocket::State;
+use serde::{Deserialize, Serialize};
 use crate::server_config::ServerConfig;
 
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "rocket::serde")]
+#[derive(Serialize)]
 struct Item {
     path: String,
     mime: String,
@@ -14,28 +12,32 @@ struct Item {
     is_dir: bool,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "rocket::serde")]
-pub struct IndexJsonSuccess {
+#[derive(Serialize)]
+struct ResponseSuccess {
+    success: bool,
     items: Vec<Item>,
     current_path: String,
     parent_path: String,
     root_path: String,
 }
 
-#[derive(Responder)]
-pub enum IndexJsonResponse {
-    #[response(status = 200)]
-    Html(Json<IndexJsonSuccess>),
-    #[response(status = 404)]
-    NotFound(&'static str),
+#[derive(Serialize)]
+struct ResponseError {
+    success: bool,
+    message: &'static str,
 }
 
-#[get("/index?<path>")]
-pub async fn index(path: Option<String>, config: &State<ServerConfig>) -> IndexJsonResponse {
+#[derive(Deserialize)]
+struct IndexQuery {
+    path: Option<String>,
+}
+
+
+#[get("/index")]
+pub async fn index(query: web::Query<IndexQuery>, config: web::Data<ServerConfig>) -> impl Responder {
     let current_path = config.current_path();
     let root = Path::new(&current_path);
-    let mut path = path.unwrap_or("/".into());
+    let mut path = query.path.clone().unwrap_or("/".into());
     while path.starts_with('/') {
         path = path[1..].to_string()
     }
@@ -45,7 +47,11 @@ pub async fn index(path: Option<String>, config: &State<ServerConfig>) -> IndexJ
     let path = joined_path.as_path();
 
     if !path.is_dir() {
-        return IndexJsonResponse::NotFound("404 Not Found");
+        return HttpResponse::NotFound()
+            .json(ResponseError {
+                success: false,
+                message: "Not a directory"
+            });
     }
 
     let parent = diff_paths(path.parent().unwrap_or(path), root).unwrap();
@@ -70,12 +76,12 @@ pub async fn index(path: Option<String>, config: &State<ServerConfig>) -> IndexJ
     let parent_path = String::from(parent.to_str().unwrap());
     let root_path = String::from(root.to_str().unwrap());
 
-    let success = IndexJsonSuccess {
-        items,
-        current_path,
-        parent_path,
-        root_path,
-    };
-
-    IndexJsonResponse::Html(Json(success))
+    HttpResponse::Ok()
+        .json(ResponseSuccess {
+            success: true,
+            items,
+            current_path,
+            parent_path,
+            root_path,
+        })
 }

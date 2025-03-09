@@ -4,17 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alphanumeric-sort = "1.5.3"
 mime_guess = "2.0.5"
 pathdiff = "0.2.3"
-rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0.218", features = ["derive"] }
 thumbnailer = "0.5.1"
-rocket_cors = "0.6.0"
-cached = { version = "0.55.1", features = ["disk_store"] }
-xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
+cached = "0.55.1"
+xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
 rust-embed = "8.6.0"
-axum = { version = "0.8.1", features = ["http2", "macros", "ws"] }
+actix-files = "0.6.6"
+actix-web = "4.9.0"
+env_logger = "0.11.6"
+actix-cors = "0.7.0"
+
 
 [dependencies.rocket_dyn_templates]
 version = "0.2.0"

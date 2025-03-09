@@ -1,16 +1,11 @@
-#[macro_use] extern crate rocket;
-
 pub mod endpoints;
 mod server_config;
 
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use rocket::http::{ContentType, Method};
-use rocket::response::status::NotFound;
-use rocket_cors::{AllowedOrigins, CorsOptions};
-use rocket_dyn_templates::Template;
+use actix_cors::Cors;
+use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use server_config::ServerConfig;
 use rust_embed::Embed;
+use env_logger::Env;
 use endpoints::{
     change_path::change_path,
     thumbnail::thumbnail,
@@ -22,49 +17,60 @@ use endpoints::{
 #[folder = "ui/dist"]
 struct Asset;
 
-#[get("/<path..>")]
-fn get_static(path: PathBuf) -> Result<(ContentType, Vec<u8>), NotFound<String>> {
-    let mut content_type = ContentType::from_extension(path.extension().unwrap_or(OsStr::new("/")).to_str().unwrap())
-        .unwrap_or(ContentType::Binary);
-    let mut path = path.to_str().unwrap();
-    if !path.starts_with("assets/") {
-        path = "index.html";
-        content_type = ContentType::HTML;
-    }
+async fn assets(req: HttpRequest) -> impl Responder {
+    let path_tmp = format!("__assets/{}", req.match_info().query("path"));
+    let path = path_tmp.as_str();
     if let Some(file) = Asset::get(path) {
-        Ok((
-            content_type,
-            file.data.to_vec(),
-        ))
+        let content_type = mime_guess::from_path(path).first_or_octet_stream().to_string();
+        HttpResponse::Ok()
+            .content_type(content_type)
+            .body(file.data)
     } else {
-        Err(NotFound(format!("404 Not Found: {}", path)))
+        HttpResponse::NotFound()
+            .body(format!("404 Not Found: {}", path))
     }
 }
 
-#[launch]
-fn rocket() -> _ {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     let is_debug = cfg!(debug_assertions);
     let port = if is_debug { 9474 } else { 8474 };
 
-    let cors = CorsOptions::default()
-        .allowed_origins(if is_debug {
-            AllowedOrigins::All
-        } else {
-            AllowedOrigins::some_null()
-        })
-        .allowed_methods(
-            vec![Method::Get, Method::Post]
-                .into_iter()
-                .map(From::from)
-                .collect(),
-        )
-        .allow_credentials(true);
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
 
-    rocket::build()
-        .configure(rocket::Config::figment().merge(("port", port)))
-        .attach(Template::fairing())
-        .attach(cors.to_cors().unwrap())
-        .manage(ServerConfig::new())
-        .mount("/api/", routes![index, thumbnail, change_path, download])
-        .mount("/", routes![get_static])
+    let app = HttpServer::new(move || {
+        let cors = if is_debug {
+            Cors::default()
+                .allowed_methods(vec!["GET", "POST"])
+                .allow_any_header()
+                .allow_any_origin()
+        } else {
+            Cors::default()
+        };
+
+        App::new()
+            .wrap(middleware::Compress::default())
+            .wrap(middleware::Logger::default())
+            .wrap(cors)
+            .app_data(web::Data::new(ServerConfig::new()))
+            .service(
+                web::scope("/api")
+                    .service(download)
+                    .service(thumbnail)
+                    .service(index)
+                    .service(change_path)
+            )
+            .service(
+                web::resource("/__assets/{path:.*}")
+                    .route(web::get().to(assets))
+            )
+            .default_service(web::route().to(async || {
+                HttpResponse::Ok()
+                    .content_type("html")
+                    .body(Asset::get("index.html").unwrap().data)
+            }))
+    })
+        .bind(("127.0.0.1", port))?
+        .run();
+    app.await
 }

@@ -1,21 +1,19 @@
 use std::path::Path;
-use rocket::fs::NamedFile;
-use rocket::State;
+use actix_web::{get, web, Either, HttpResponse};
+use actix_files::NamedFile;
+use serde::Deserialize;
 use crate::server_config::ServerConfig;
 
-#[derive(Responder)]
-pub enum DownloadResponse {
-    #[response(status = 200)]
-    File(NamedFile),
-    #[response(status = 404)]
-    NotFound(&'static str),
+#[derive(Deserialize)]
+struct DownloadQuery {
+    path: String,
 }
 
-#[get("/download?<path>")]
-pub async fn download(path: String, config: &State<ServerConfig>) -> DownloadResponse {
+#[get("/download")]
+pub async fn download(query: web::Query<DownloadQuery>, config: web::Data<ServerConfig>) -> Either<NamedFile, HttpResponse> {
     let current_path = config.current_path();
     let root = Path::new(&current_path);
-    let mut path = path;
+    let mut path = query.path.clone();
     while path.starts_with('/') {
         path = path[1..].to_string()
     }
@@ -23,8 +21,10 @@ pub async fn download(path: String, config: &State<ServerConfig>) -> DownloadRes
     println!("{} + {} = {}", (&root).to_str().unwrap(), &path, (&joined_path).to_str().unwrap());
 
     if joined_path.is_file() {
-        DownloadResponse::File(NamedFile::open(joined_path).await.unwrap())
+        Either::Left(NamedFile::open(joined_path).unwrap())
+        // DownloadResponse::File(NamedFile::open(joined_path).await.unwrap())
     } else {
-        DownloadResponse::NotFound("404 Not Found")
+        Either::Right(HttpResponse::NotFound()
+            .body("404 Not Found"))
     }
 }

@@ -1,3 +1,4 @@
+use std::env::home_dir;
 use std::sync::{Arc, Mutex};
 
 pub struct ServerConfig {
@@ -6,8 +7,9 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     pub fn new() -> Self {
+        let home_path = home_dir().unwrap().to_str().unwrap().to_string();
         Self {
-            current_path_str: Arc::new(Mutex::new(String::from("/home/user"))),
+            current_path_str: Arc::new(Mutex::new(home_path)),
         }
     }
 
