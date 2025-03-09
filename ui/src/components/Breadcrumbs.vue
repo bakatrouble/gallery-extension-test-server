@@ -30,8 +30,8 @@ const crumbs = computed(() => path.split('/').filter(Boolean));
     <a
       class="mr-2 text-2xl text-gray-500 dark:text-gray-400 hover:underline"
       v-if="root"
-      :href="root"
-      @click.prevent="emit('navigate', currentRoot)"
+      href="/"
+      @click.prevent="emit('navigate', '/')"
     >
       {{currentRoot}}
     </a>

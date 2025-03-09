@@ -35,9 +35,9 @@ struct IndexQuery {
 
 #[get("/index")]
 pub async fn index(query: web::Query<IndexQuery>, config: web::Data<ServerConfig>) -> impl Responder {
-    let current_path = config.current_path();
+    let current_path = config.current_path().replace("\\", "/");
     let root = Path::new(&current_path);
-    let mut path = query.path.clone().unwrap_or("/".into());
+    let mut path = query.path.clone().unwrap_or("/".into()).replace("\\", "/");
     while path.starts_with('/') {
         path = path[1..].to_string()
     }
@@ -60,7 +60,7 @@ pub async fn index(query: web::Query<IndexQuery>, config: web::Data<ServerConfig
         .collect();
 
     let items = files.iter().map(|entry| {
-        let path = String::from(diff_paths(entry, root).unwrap().to_str().unwrap());
+        let path = String::from(diff_paths(entry, root).unwrap().to_str().unwrap()).replace("\\", "/");
         let name = String::from(entry.file_name().unwrap().to_str().unwrap());
         let mime = mime_guess::from_path(entry).first_or_octet_stream().to_string();
         let is_dir = entry.is_dir();
@@ -72,9 +72,9 @@ pub async fn index(query: web::Query<IndexQuery>, config: web::Data<ServerConfig
         }
     }).collect();
 
-    let current_path = String::from(joined_path.to_str().unwrap());
-    let parent_path = String::from(parent.to_str().unwrap());
-    let root_path = String::from(root.to_str().unwrap());
+    let current_path = String::from(joined_path.to_str().unwrap()).replace("\\", "/");
+    let parent_path = String::from(parent.to_str().unwrap()).replace("\\", "/");
+    let root_path = String::from(root.to_str().unwrap()).replace("\\", "/");
 
     HttpResponse::Ok()
         .json(ResponseSuccess {
